@@ -20,6 +20,9 @@ param() {
     --name "${param_prefix}/$1" --query Parameter.Value --output text
 }
 
+IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+
 umask 077
 cat > app.env <<EOF
 DB_HOST=${db_host}
@@ -35,10 +38,19 @@ WAF_WEB_ACL_NAME=${web_acl_name}
 WAF_WEB_ACL_ARN=${web_acl_arn}
 WAF_RULE_METRICS=${waf_rule_metrics}
 SNS_TOPIC_ARN=${sns_topic_arn}
-ENABLE_VULNERABLE_DEMO=${enable_vulnerable_demo}
+APP_ENV=production
+ENABLE_VULNERABLE_DEMO=false
+COOKIE_SECURE=false
+EC2_INSTANCE_ID=$INSTANCE_ID
+DB_INSTANCE_ID=${db_instance_id}
+ALB_ARN_SUFFIX=${alb_arn_suffix}
+TARGET_GROUP_ARN_SUFFIX=${tg_arn_suffix}
+APP_LOG_GROUP=${log_group}
+ALARM_PREFIX=${alarm_prefix}
 SECRET_KEY=$(param secret_key)
 ADMIN_PASSWORD=$(param admin_password)
 ANALYST_PASSWORD=$(param analyst_password)
+VIEWER_PASSWORD=$(param viewer_password)
 EOF
 
 docker rm -f queryguard 2>/dev/null || true

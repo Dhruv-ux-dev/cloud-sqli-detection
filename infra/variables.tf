@@ -71,12 +71,6 @@ variable "suspicious_alarm_threshold" {
   default     = 10
 }
 
-variable "enable_vulnerable_demo" {
-  description = "Expose the deliberately vulnerable demo endpoint. Keep false except during the controlled demo."
-  type        = bool
-  default     = false
-}
-
 variable "log_retention_days" {
   description = "CloudWatch Logs retention for app, WAF and database logs."
   type        = number

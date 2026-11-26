@@ -65,11 +65,20 @@ resource "random_password" "analyst" {
   min_numeric = 2
 }
 
+resource "random_password" "viewer" {
+  length      = 20
+  special     = false
+  min_upper   = 2
+  min_lower   = 2
+  min_numeric = 2
+}
+
 resource "aws_ssm_parameter" "app" {
   for_each = {
     secret_key       = random_password.secret_key.result
     admin_password   = random_password.admin.result
     analyst_password = random_password.analyst.result
+    viewer_password  = random_password.viewer.result
   }
 
   name  = "/${local.name}/${each.key}"
@@ -139,15 +148,34 @@ data "aws_iam_policy_document" "app" {
   }
 
   statement {
-    sid       = "ReadWafSamples"
-    actions   = ["wafv2:GetSampledRequests"]
+    sid       = "ReadWafAcl"
+    actions   = ["wafv2:GetSampledRequests", "wafv2:GetWebACL"]
     resources = [aws_wafv2_web_acl.main.arn]
+  }
+
+  # Read-only calls behind the console's AWS Infrastructure page. These
+  # Describe/Get actions do not support resource-level restrictions.
+  statement {
+    sid = "ReadInfrastructureState"
+    actions = [
+      "cloudwatch:GetMetricStatistics",
+      "cloudwatch:DescribeAlarms",
+      "ec2:DescribeInstanceStatus",
+      "rds:DescribeDBInstances",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    sid       = "ReadAlertTopic"
+    actions   = ["sns:GetTopicAttributes"]
+    resources = [aws_sns_topic.alerts.arn]
   }
 
   statement {
     sid       = "ShipAppLogs"
     actions   = ["logs:CreateLogStream", "logs:PutLogEvents", "logs:DescribeLogStreams"]
-    resources = ["${aws_cloudwatch_log_group.app.arn}:*"]
+    resources = [aws_cloudwatch_log_group.app.arn, "${aws_cloudwatch_log_group.app.arn}:*"]
   }
 }
 
@@ -204,18 +232,21 @@ resource "aws_instance" "app" {
 
   user_data_replace_on_change = true
   user_data = templatefile("${path.module}/user_data.sh.tftpl", {
-    region                 = var.region
-    bucket                 = aws_s3_bucket.artifacts.id
-    bundle_key             = aws_s3_object.app.key
-    param_prefix           = "/${local.name}"
-    log_group              = aws_cloudwatch_log_group.app.name
-    db_host                = aws_db_instance.main.address
-    db_secret_arn          = aws_db_instance.main.master_user_secret[0].secret_arn
-    web_acl_name           = aws_wafv2_web_acl.main.name
-    web_acl_arn            = aws_wafv2_web_acl.main.arn
-    waf_rule_metrics       = join(",", [local.waf_metrics.aws_sqli, local.waf_metrics.custom, local.waf_metrics.rate, local.waf_metrics.bad_input])
-    sns_topic_arn          = aws_sns_topic.alerts.arn
-    enable_vulnerable_demo = var.enable_vulnerable_demo ? "true" : "false"
+    region           = var.region
+    bucket           = aws_s3_bucket.artifacts.id
+    bundle_key       = aws_s3_object.app.key
+    param_prefix     = "/${local.name}"
+    log_group        = aws_cloudwatch_log_group.app.name
+    db_host          = aws_db_instance.main.address
+    db_secret_arn    = aws_db_instance.main.master_user_secret[0].secret_arn
+    web_acl_name     = aws_wafv2_web_acl.main.name
+    web_acl_arn      = aws_wafv2_web_acl.main.arn
+    waf_rule_metrics = join(",", [local.waf_metrics.aws_sqli, local.waf_metrics.custom, local.waf_metrics.rate, local.waf_metrics.bad_input])
+    sns_topic_arn    = aws_sns_topic.alerts.arn
+    db_instance_id   = aws_db_instance.main.identifier
+    alb_arn_suffix   = aws_lb.main.arn_suffix
+    tg_arn_suffix    = aws_lb_target_group.app.arn_suffix
+    alarm_prefix     = "${local.name}-"
   })
 
   tags = { Name = "${local.name}-app" }

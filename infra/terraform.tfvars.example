@@ -9,5 +9,5 @@ region      = "ap-south-1"
 # AWS Academy Learner Lab cannot create IAM roles. Use the lab's profile:
 # existing_instance_profile_name = "LabInstanceProfile"
 
-# Only for the controlled demo of an unprotected endpoint:
-# enable_vulnerable_demo = true
+# The deliberately vulnerable demo endpoint is never enabled in AWS
+# (APP_ENV=production refuses it). Use it only in a local run.

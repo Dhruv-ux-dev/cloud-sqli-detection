@@ -3,10 +3,6 @@ output "app_url" {
   value       = "http://${aws_lb.main.dns_name}"
 }
 
-output "security_console_url" {
-  value = "http://${aws_lb.main.dns_name}/security"
-}
-
 output "admin_password" {
   description = "Password for the 'admin' account. Show it with: terraform output -raw admin_password"
   value       = random_password.admin.result
@@ -17,6 +13,17 @@ output "analyst_password" {
   description = "Password for the 'analyst' account. Show it with: terraform output -raw analyst_password"
   value       = random_password.analyst.result
   sensitive   = true
+}
+
+output "viewer_password" {
+  description = "Password for the read-only 'viewer' account. Show it with: terraform output -raw viewer_password"
+  value       = random_password.viewer.result
+  sensitive   = true
+}
+
+output "console_url" {
+  description = "Security operations console (sign in first)."
+  value       = "http://${aws_lb.main.dns_name}/console"
 }
 
 output "cloudwatch_dashboard_url" {
