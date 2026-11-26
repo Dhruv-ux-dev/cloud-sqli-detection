@@ -18,7 +18,6 @@
   api("/api/me").then((user) => {
     me = user;
     document.getElementById("who").textContent = `${user.username} (${user.role})`;
-    if (user.role === "admin") document.getElementById("nav-security").hidden = false;
   });
 
   api("/api/config").then((cfg) => {

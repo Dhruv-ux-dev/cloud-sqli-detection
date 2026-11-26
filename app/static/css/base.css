@@ -2,49 +2,28 @@
    wide for headings and figures, normal for reading text. */
 
 :root {
-  --paper: #edf0f3;
-  --surface: #ffffff;
-  --ink: #18202b;
-  --ink-2: #4a5566;
-  --ink-3: #6f7a8a;
-  --rule: #cbd3dc;
-  --rule-soft: #dfe4ea;
-  --cobalt: #2b4c9b;
-  --cobalt-press: #213c7c;
-  --pass: #2e7a68;
-  --flag: #b7790b;
-  --block: #c33a2e;
-  --pass-soft: #dcefe9;
-  --flag-soft: #f8ecd2;
-  --block-soft: #f7dfdc;
-  --tick-normal: #9fb7b0;
-  --focus: #2b4c9b;
+  /* Same palette as the security console (dark-first). */
+  --paper: #0b1120;
+  --surface: #172033;
+  --ink: #f8fafc;
+  --ink-2: #94a3b8;
+  --ink-3: #64748b;
+  --rule: #263449;
+  --rule-soft: #1f2b40;
+  --cobalt: #38bdf8;
+  --cobalt-press: #7dd3fc;
+  --btn-ink: #082f49;
+  --pass: #22c55e;
+  --flag: #f59e0b;
+  --block: #ef4444;
+  --pass-soft: rgba(34, 197, 94, 0.13);
+  --flag-soft: rgba(245, 158, 11, 0.13);
+  --block-soft: rgba(239, 68, 68, 0.14);
+  --tick-normal: #3b5a78;
+  --focus: #38bdf8;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
-  color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --paper: #141a21;
-    --surface: #1b232d;
-    --ink: #e5e9ef;
-    --ink-2: #aeb8c6;
-    --ink-3: #8592a3;
-    --rule: #334050;
-    --rule-soft: #283240;
-    --cobalt: #7f9fe6;
-    --cobalt-press: #9db5ee;
-    --pass: #5cb59f;
-    --flag: #e0a83a;
-    --block: #ec6f62;
-    --pass-soft: #1f3a33;
-    --flag-soft: #3d3220;
-    --block-soft: #452624;
-    --tick-normal: #4c6a63;
-    --focus: #9db5ee;
-    color-scheme: dark;
-  }
+  color-scheme: dark;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -139,7 +118,7 @@ input[type="text"], input[type="password"], input[type="search"] {
   width: 100%;
   font: inherit;
   color: var(--ink);
-  background: var(--surface);
+  background: #111827;
   border: 1px solid var(--rule);
   border-radius: 3px;
   padding: 10px 12px;
@@ -158,16 +137,13 @@ input:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; border
   border-radius: 3px;
   border: 1px solid var(--cobalt);
   background: var(--cobalt);
-  color: #fff;
+  color: var(--btn-ink);
   cursor: pointer;
 }
 .btn:hover { background: var(--cobalt-press); border-color: var(--cobalt-press); }
 .btn[disabled] { opacity: 0.6; cursor: progress; }
 .btn.quiet { background: transparent; color: var(--cobalt); }
 .btn.quiet:hover { background: var(--paper); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .btn:not(.quiet) { color: #10161d; }
-}
 
 .notice {
   border-left: 3px solid var(--ink-3);

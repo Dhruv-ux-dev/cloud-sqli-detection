@@ -12,6 +12,7 @@ class ApiError extends Error {
 
 async function api(path, options = {}) {
   const init = { credentials: "same-origin", headers: {}, ...options };
+  if (init.method && init.method !== "GET") init.headers["X-Northfield-CSRF"] = "1";
   if (init.body && typeof init.body !== "string") {
     init.headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(init.body);
