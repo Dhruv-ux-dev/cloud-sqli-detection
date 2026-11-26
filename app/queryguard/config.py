@@ -36,6 +36,20 @@ class Settings:
     secret_key: str = field(default_factory=lambda: os.getenv("SECRET_KEY", ""))
     admin_password: str = field(default_factory=lambda: os.getenv("ADMIN_PASSWORD", ""))
     analyst_password: str = field(default_factory=lambda: os.getenv("ANALYST_PASSWORD", ""))
+    viewer_password: str = field(default_factory=lambda: os.getenv("VIEWER_PASSWORD", ""))
+
+    # local | development | production. Shown in the console header; the
+    # deliberately vulnerable demo endpoint can never run in production.
+    app_env: str = field(default_factory=lambda: os.getenv("APP_ENV", "local").lower())
+
+    # AWS resource identifiers used by the infrastructure monitor (set by
+    # Terraform; all optional).
+    ec2_instance_id: str | None = field(default_factory=lambda: os.getenv("EC2_INSTANCE_ID"))
+    db_instance_id: str | None = field(default_factory=lambda: os.getenv("DB_INSTANCE_ID"))
+    alb_arn_suffix: str | None = field(default_factory=lambda: os.getenv("ALB_ARN_SUFFIX"))
+    target_group_arn_suffix: str | None = field(default_factory=lambda: os.getenv("TARGET_GROUP_ARN_SUFFIX"))
+    app_log_group: str | None = field(default_factory=lambda: os.getenv("APP_LOG_GROUP"))
+    alarm_prefix: str | None = field(default_factory=lambda: os.getenv("ALARM_PREFIX"))
     cookie_secure: bool = field(default_factory=lambda: _bool("COOKIE_SECURE", False))
 
     # "aws": AWS WAF sits in front; the app still rejects high-confidence
@@ -67,8 +81,17 @@ class Settings:
     lockout_seconds: int = field(default_factory=lambda: _int("LOCKOUT_SECONDS", 600))
     alert_cooldown_seconds: int = field(default_factory=lambda: _int("ALERT_COOLDOWN_SECONDS", 300))
     search_row_limit: int = field(default_factory=lambda: _int("SEARCH_ROW_LIMIT", 25))
+    api_rate_limit: int = field(default_factory=lambda: _int("API_RATE_LIMIT", 1200))
+
+    @property
+    def vulnerable_demo_active(self) -> bool:
+        return self.enable_vulnerable_demo and self.app_env != "production"
 
     def validate(self) -> None:
+        if self.app_env not in {"local", "development", "production"}:
+            raise RuntimeError(f"APP_ENV must be local, development or production, got {self.app_env!r}")
+        if self.app_env == "production" and self.waf_mode == "off":
+            raise RuntimeError("WAF_MODE=off is not allowed when APP_ENV=production")
         if self.waf_mode not in {"aws", "emulated", "off"}:
             raise RuntimeError(f"WAF_MODE must be aws, emulated or off, got {self.waf_mode!r}")
         if len(self.secret_key) < 32:

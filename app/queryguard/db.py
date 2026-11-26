@@ -1,12 +1,14 @@
-"""Database bootstrap and the runtime connection pool.
+"""Database bootstrap, migrations and the runtime connection pool.
 
 Two identities are used:
-  * the bootstrap login (RDS master user, from Secrets Manager on AWS) creates
-    tables, the login function and the runtime role, then disconnects;
+  * the bootstrap login (RDS master user, from Secrets Manager on AWS) applies
+    migrations, owns the login function and creates the runtime role, then
+    disconnects;
   * the runtime role (qg_app) serves every request. It can read customers,
-    write logs, and nothing else: no DDL, no DELETE, no access to password
-    hashes. Its password is derived from SECRET_KEY, so nothing extra has to
-    be stored anywhere.
+    write logs and manage incident workflow, and nothing else: no DDL, no
+    DELETE anywhere, no read access to password hashes, no way to edit or
+    remove audit records. Its password is derived from SECRET_KEY, so nothing
+    extra has to be stored.
 """
 
 from __future__ import annotations
@@ -30,6 +32,27 @@ from .config import Settings
 log = logging.getLogger("queryguard.db")
 
 _pool: ConnectionPool | None = None
+
+# Runtime role privileges, re-applied at every start so they always match
+# the code. {r} is the runtime role.
+GRANTS = (
+    "REVOKE ALL ON ALL TABLES IN SCHEMA public FROM {r}",
+    "REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM {r}",
+    "GRANT USAGE ON SCHEMA public TO {r}",
+    "GRANT SELECT ON customers TO {r}",
+    # Users: read everything except the hash; write the hash but never read it.
+    "GRANT SELECT (id, username, role, created_at, display_name, is_active, last_login_at, session_epoch) ON users TO {r}",
+    "GRANT INSERT (username, password_hash, role, display_name) ON users TO {r}",
+    "GRANT UPDATE (role, display_name, is_active, last_login_at, session_epoch, password_hash) ON users TO {r}",
+    "GRANT SELECT, INSERT ON request_log, dlp_access, simulation_run, incident_note TO {r}",
+    "GRANT SELECT, INSERT, UPDATE ON security_event, security_alert, blocked_source TO {r}",
+    "GRANT SELECT, INSERT, UPDATE ON security_policy, rule_state TO {r}",
+    # Audit log: append and read only (a trigger also blocks UPDATE/DELETE).
+    "GRANT SELECT, INSERT ON audit_log TO {r}",
+    "GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO {r}",
+    "REVOKE ALL ON FUNCTION auth_lookup(text) FROM PUBLIC",
+    "GRANT EXECUTE ON FUNCTION auth_lookup(text) TO {r}",
+)
 
 
 def _admin_credentials(s: Settings) -> tuple[str, str]:
@@ -60,16 +83,38 @@ def _conninfo(s: Settings, user: str, password: str) -> str:
     )
 
 
+def migration_files() -> list[tuple[str, str]]:
+    folder = resources.files("queryguard").joinpath("migrations")
+    files = sorted(p for p in folder.iterdir() if p.name.endswith(".sql"))
+    return [(p.name.removesuffix(".sql"), p.read_text()) for p in files]
+
+
+def _migrate(conn: psycopg.Connection) -> list[str]:
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS schema_migrations (
+               version    text PRIMARY KEY,
+               applied_at timestamptz NOT NULL DEFAULT now())"""
+    )
+    done = {r[0] for r in conn.execute("SELECT version FROM schema_migrations")}
+    applied = []
+    for version, body in migration_files():
+        if version in done:
+            continue
+        conn.execute(body)
+        conn.execute("INSERT INTO schema_migrations (version) VALUES (%s)", (version,))
+        applied.append(version)
+    return applied
+
+
 def bootstrap(s: Settings) -> None:
     user, password = _admin_credentials(s)
     role = sql.Identifier(s.db_app_role)
-    schema_sql = resources.files("queryguard").joinpath("schema.sql").read_text()
 
     with psycopg.connect(_conninfo(s, user, password)) as conn:
         with conn.transaction():
             # Serialise concurrent start-ups.
             conn.execute("SELECT pg_advisory_xact_lock(531531)")
-            conn.execute(schema_sql)
+            applied = _migrate(conn)
 
             exists = conn.execute(
                 "SELECT 1 FROM pg_roles WHERE rolname = %s", (s.db_app_role,)
@@ -81,22 +126,12 @@ def bootstrap(s: Settings) -> None:
                     "CONNECTION LIMIT 30 PASSWORD {}"
                 ).format(role, sql.Literal(app_role_password(s)))
             )
-
-            for stmt in (
-                "REVOKE ALL ON ALL TABLES IN SCHEMA public FROM {r}",
-                "GRANT USAGE ON SCHEMA public TO {r}",
-                "GRANT SELECT ON customers TO {r}",
-                "GRANT SELECT (id, username, role, created_at) ON users TO {r}",
-                "GRANT SELECT, INSERT ON request_log, security_event TO {r}",
-                "GRANT USAGE ON SEQUENCE request_log_id_seq, security_event_id_seq TO {r}",
-                "REVOKE ALL ON FUNCTION auth_lookup(text) FROM PUBLIC",
-                "GRANT EXECUTE ON FUNCTION auth_lookup(text) TO {r}",
-            ):
+            for stmt in GRANTS:
                 conn.execute(sql.SQL(stmt).format(r=role))
 
             _seed_users(conn, s)
             _seed_customers(conn)
-    log.info("database bootstrap complete")
+    log.info("database bootstrap complete; migrations applied: %s", applied or "none")
 
 
 def _hash(password: str) -> str:
@@ -104,22 +139,28 @@ def _hash(password: str) -> str:
 
 
 def _seed_users(conn: psycopg.Connection, s: Settings) -> None:
-    for username, role, password in (
-        ("admin", "admin", s.admin_password),
-        ("analyst", "analyst", s.analyst_password),
-    ):
+    accounts = [
+        ("admin", "admin", "Platform administrator", s.admin_password),
+        ("analyst", "analyst", "Security analyst", s.analyst_password),
+    ]
+    if s.viewer_password:
+        accounts.append(("viewer", "viewer", "Read-only viewer", s.viewer_password))
+
+    for username, role, display, password in accounts:
         row = conn.execute(
             "SELECT password_hash FROM users WHERE username = %s", (username,)
         ).fetchone()
         if row is None:
             conn.execute(
-                "INSERT INTO users (username, password_hash, role) VALUES (%s, %s, %s)",
-                (username, _hash(password), role),
+                """INSERT INTO users (username, password_hash, role, display_name)
+                   VALUES (%s, %s, %s, %s)""",
+                (username, _hash(password), role, display),
             )
         elif not bcrypt.checkpw(password.encode(), row[0].encode()):
             # Environment password changed (e.g. Terraform re-generated it).
             conn.execute(
-                "UPDATE users SET password_hash = %s WHERE username = %s",
+                """UPDATE users SET password_hash = %s, session_epoch = session_epoch + 1
+                   WHERE username = %s""",
                 (_hash(password), username),
             )
 
@@ -146,6 +187,7 @@ def open_pool(s: Settings) -> ConnectionPool:
         kwargs={"autocommit": True, "row_factory": dict_row},
         open=True,
         name="queryguard",
+        timeout=5,
     )
     _pool.wait(timeout=30)
     return _pool

@@ -59,6 +59,8 @@ class Client:
         req.add_header("User-Agent", self.ua)
         if data is not None:
             req.add_header("Content-Type", "application/json")
+        if method != "GET":
+            req.add_header("X-Northfield-CSRF", "1")
         try:
             with self.opener.open(req, timeout=15) as res:
                 return res.status, res.read().decode(errors="replace")

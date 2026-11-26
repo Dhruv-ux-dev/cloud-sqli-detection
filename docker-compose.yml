@@ -26,6 +26,10 @@ services:
       DB_SSLMODE: disable
     ports:
       - "8000:8000"
+    # Serve the frontend straight from the source tree, so page edits show
+    # on reload without rebuilding the image.
+    volumes:
+      - ./app/static:/srv/static:ro
     depends_on:
       db:
         condition: service_healthy

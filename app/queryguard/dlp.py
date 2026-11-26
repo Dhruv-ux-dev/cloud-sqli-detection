@@ -83,3 +83,32 @@ def detail_row(row: dict, reveal: bool) -> dict:
 
 def escape_like(term: str) -> str:
     return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+SENSITIVE_FIELDS = {
+    "email": "Email address",
+    "phone": "Phone number",
+    "pan": "PAN (tax identifier)",
+    "account_no": "Bank account number",
+    "balance": "Account balance",
+}
+
+
+def record_access(username: str, role: str, access_type: str, *, authorized: bool,
+                  customer_id: int | None = None, fields: list[str] | None = None,
+                  row_count: int = 0, client_ip: str | None = None) -> None:
+    """Who touched which sensitive fields. Field names only, never values."""
+    from . import db
+
+    try:
+        with db.pool().connection() as conn:
+            conn.execute(
+                """INSERT INTO dlp_access (username, role, customer_id, fields, access_type, authorized,
+                                           row_count, client_ip)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                (username, role, customer_id, fields or [], access_type, authorized, row_count, client_ip),
+            )
+    except Exception:
+        import logging
+
+        logging.getLogger("queryguard.dlp").exception("could not write dlp_access")
