@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in | Northfield Records</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/login.css">
+</head>
+<body>
+  <main class="login">
+    <section class="login-form" aria-labelledby="title">
+      <p class="org">Northfield Cooperative Bank</p>
+      <h1 id="title">Customer records desk</h1>
+      <p class="muted lede">Staff sign-in. Every request to this desk is screened for SQL injection before it reaches customer data.</p>
+
+      <form id="form" novalidate>
+        <div class="field">
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" autocomplete="username" required maxlength="64">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="128">
+        </div>
+        <p id="error" class="notice error" role="alert" hidden></p>
+        <button class="btn" type="submit" id="submit">Sign in</button>
+      </form>
+    </section>
+
+    <aside class="path" aria-labelledby="path-title">
+      <h2 id="path-title">What a request passes through</h2>
+      <ol>
+        <li><strong>AWS WAF</strong><span>Drops requests that match SQL injection signatures before they reach the server.</span></li>
+        <li><strong>Application filter</strong><span>Scores what gets through, flags the doubtful, rejects the obvious.</span></li>
+        <li><strong>Parameterised queries</strong><span>User input is sent as data, never as part of the SQL text.</span></li>
+        <li><strong>Least-privilege database role</strong><span>No schema changes, no deletes, no access to password hashes.</span></li>
+        <li><strong>Masked output</strong><span>Identifiers leave the API masked; heavy reading pauses the account.</span></li>
+      </ol>
+      <p class="mode small" id="mode"></p>
+    </aside>
+  </main>
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/login.js"></script>
+</body>
+</html>

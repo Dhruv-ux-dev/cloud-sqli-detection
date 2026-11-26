@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Customer records | Northfield Records</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/records.css">
+</head>
+<body>
+  <header class="bar">
+    <a class="brand" href="/records">Northfield <small>Customer records desk</small></a>
+    <nav aria-label="Main">
+      <a href="/records" aria-current="page">Records</a>
+      <a href="/security" id="nav-security" hidden>Security console</a>
+      <span class="who" id="who"></span>
+      <button class="linkish" type="button" data-signout>Sign out</button>
+    </nav>
+  </header>
+
+  <main class="desk">
+    <section class="finder" aria-labelledby="find-title">
+      <h1 id="find-title">Find a customer</h1>
+      <form id="search" class="search" role="search">
+        <label for="q" class="visually-hidden">Name, city or branch</label>
+        <input id="q" name="q" type="search" placeholder="Name, city or branch" minlength="2" maxlength="64" autocomplete="off">
+        <button class="btn" type="submit">Search</button>
+      </form>
+      <p class="muted small hint">Shows up to 25 matches. Email and account numbers are masked in results.</p>
+
+      <p id="search-msg" class="notice" role="status" hidden></p>
+
+      <table class="results" id="results" hidden>
+        <thead>
+          <tr><th scope="col">Name</th><th scope="col">City and branch</th><th scope="col">Email</th><th scope="col">Account</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <div class="empty" id="empty">
+        <p>Search by name (try <button type="button" class="chip" data-try="Sharma">Sharma</button>), city (<button type="button" class="chip" data-try="Patiala">Patiala</button>) or branch (<button type="button" class="chip" data-try="Sector 17">Sector 17</button>).</p>
+      </div>
+    </section>
+
+    <aside class="record" id="record" aria-live="polite">
+      <p class="muted">Select a customer to see their record.</p>
+    </aside>
+  </main>
+
+  <section class="unsafe" id="unsafe" hidden aria-labelledby="unsafe-title">
+    <div class="unsafe-inner">
+      <h2 id="unsafe-title">Unprotected search, for the controlled demo</h2>
+      <p class="muted small">This endpoint builds its SQL by pasting your text into the query string. It exists only to show what the other layers prevent. It is switched off unless <code>ENABLE_VULNERABLE_DEMO=true</code>.</p>
+      <form id="unsafe-form" class="search">
+        <label for="uq" class="visually-hidden">Text pasted into the SQL</label>
+        <input id="uq" type="text" maxlength="400" autocomplete="off" spellcheck="false" placeholder="Try: x' UNION SELECT id, pan, account_no FROM customers--">
+        <button class="btn quiet" type="submit">Run unsafe query</button>
+      </form>
+      <pre id="unsafe-sql" class="sql" hidden></pre>
+      <div id="unsafe-out"></div>
+    </div>
+  </section>
+
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/records.js"></script>
+</body>
+</html>

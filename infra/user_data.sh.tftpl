@@ -1,0 +1,52 @@
+#!/bin/bash
+# Boot script for the app server (Amazon Linux 2023). Rendered by Terraform.
+# No "set -x": the script handles secrets and cloud-init logs every command.
+set -euo pipefail
+
+dnf install -y docker unzip
+systemctl enable --now docker
+
+install -d -m 700 /opt/queryguard
+cd /opt/queryguard
+
+aws s3 cp "s3://${bucket}/${bundle_key}" app.zip --region "${region}"
+rm -rf src
+mkdir src
+unzip -q app.zip -d src
+docker build -t queryguard:latest src
+
+param() {
+  aws ssm get-parameter --region "${region}" --with-decryption \
+    --name "${param_prefix}/$1" --query Parameter.Value --output text
+}
+
+umask 077
+cat > app.env <<EOF
+DB_HOST=${db_host}
+DB_PORT=5432
+DB_NAME=queryguard
+DB_SSLMODE=require
+DB_ADMIN_SECRET_ARN=${db_secret_arn}
+AWS_REGION=${region}
+AWS_DEFAULT_REGION=${region}
+WAF_MODE=aws
+TRUST_PROXY=true
+WAF_WEB_ACL_NAME=${web_acl_name}
+WAF_WEB_ACL_ARN=${web_acl_arn}
+WAF_RULE_METRICS=${waf_rule_metrics}
+SNS_TOPIC_ARN=${sns_topic_arn}
+ENABLE_VULNERABLE_DEMO=${enable_vulnerable_demo}
+SECRET_KEY=$(param secret_key)
+ADMIN_PASSWORD=$(param admin_password)
+ANALYST_PASSWORD=$(param analyst_password)
+EOF
+
+docker rm -f queryguard 2>/dev/null || true
+docker run -d --name queryguard --restart always \
+  -p 8000:8000 \
+  --env-file /opt/queryguard/app.env \
+  --log-driver awslogs \
+  --log-opt awslogs-region="${region}" \
+  --log-opt awslogs-group="${log_group}" \
+  --log-opt awslogs-stream="app-$(hostname)" \
+  queryguard:latest

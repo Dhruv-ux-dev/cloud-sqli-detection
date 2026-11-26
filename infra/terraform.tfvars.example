@@ -1,0 +1,13 @@
+# Copy to terraform.tfvars and edit:  cp terraform.tfvars.example terraform.tfvars
+
+alert_email = "you@example.com"
+region      = "ap-south-1"
+
+# Narrow access to your own IP while testing (find it at https://checkip.amazonaws.com):
+# allowed_cidrs = ["203.0.113.10/32"]
+
+# AWS Academy Learner Lab cannot create IAM roles. Use the lab's profile:
+# existing_instance_profile_name = "LabInstanceProfile"
+
+# Only for the controlled demo of an unprotected endpoint:
+# enable_vulnerable_demo = true
